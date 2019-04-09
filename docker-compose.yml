@@ -1,0 +1,11 @@
+version: '2'
+services:
+  app:
+    image: node:alpine
+    volumes:
+      - ./:/opt/app
+    working_dir: /opt/app
+    command: node src/index.js
+    ports:
+      - "3000:3000"
+ 

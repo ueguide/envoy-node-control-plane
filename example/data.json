@@ -1,0 +1,138 @@
+{
+  "cds": {
+    "service_b": {
+      "nonce": "service_b_1",
+      "resourcesList": [
+        {
+          "name": "local_service_b",
+          "connect_timeout": "25",
+          "type": "STRICT_DNS",
+          "lb_policy": "ROUND_ROBIN",
+          "load_assignment": {
+            "cluster_name": "local_service_b",
+            "endpoints": [
+              {
+                "lb_endpoints": [
+                  {
+                    "endpoint": {
+                      "address": {
+                        "socket_address": {
+                          "address": "service_b",
+                          "port_value": "3002"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "hosts": [
+            {
+              "socket_address": {
+                "address": "service_b",
+                "port_value": "3002"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "lds": {
+    "service_b": {
+      "nonce": "service_b_1",
+      "resourcesList": [
+        {
+          "address": {
+            "socket_address": {
+              "address": "0.0.0.0",
+              "port_value": "80"
+            }
+          },
+          "filter_chains": [
+            {
+              "filters": [
+                {
+                  "name": "envoy.http_connection_manager",
+                  "config": {
+                    "codec_type": "auto",
+                    "stat_prefix": "ingress_http",
+                    "rds": {
+                      "route_config_name": "local_route",
+                      "config_source": {
+                        "api_config_source": {
+                          "api_type": "GRPC",
+                          "grpc_services": {
+                            "envoy_grpc": {
+                              "cluster_name": "xds_cluster"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "http_filters": [
+                      {
+                       "name": "envoy.router",
+                       "config": {}
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "rds": {
+    "service_b": {
+      "nonce": "service_b_routes_nonce",
+      "resourcesList": [
+        {
+          "name": "local_route",
+          "virtual_hosts": [
+            {
+              "name": "service",
+              "domains": [
+                "*"
+              ],
+              "routes": [
+                {
+                  "match": {
+                    "prefix": "/"
+                  },
+                  "route": {
+                    "cluster": "local_service_b"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "eds": [
+    {
+      "cluster_name": "remote_site",
+      "endpoints": [
+        {
+          "lb_endpoints": [
+            {
+              "endpoint": {
+                "address": {
+                  "socket_address": {
+                    "address": "34.231.242.239",
+                    "port_value": "32770"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
