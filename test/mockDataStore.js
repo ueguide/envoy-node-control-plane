@@ -137,7 +137,7 @@ const data = {
   ]
 }
 
-exports.get = function getData ( requestParams ) {
+exports.get = async function getData ( requestParams ) {
 	switch( requestParams.typeUrl ) {
 		case 'type.googleapis.com/envoy.api.v2.Cluster': {
 			return data.cds && data.cds[ requestParams.node.id ] || undefined

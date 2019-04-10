@@ -5,15 +5,15 @@ const routePB = require('./pb/envoy/api/v2/route/route_pb')
 const googlePBAny = require('google-protobuf/google/protobuf/any_pb.js')
 const makeResponseNonce = require('./util/response-nonce')
 
-let store
+let cache
 
 function streamRoutes(call) {
-  call.on('data', function( request ) {
+  call.on('data', async function( request ) {
     const params = request.toObject()
     // console.log(JSON.stringify( params, null, 2 ))
 
     // get stored data for request
-    const storedData = store.get( params )
+    const storedData = await cache.get( params )
     if ( !storedData ) {
       // console.log('NO DATA AVAILABLE')
       //return this.end()
@@ -106,8 +106,8 @@ function fetchRoutes(call, callback) {
   console.log('fetchRoutes called')
 }
 
-exports.registerServices = function ( server, configStore ) {
-  store = configStore 
+exports.registerServices = function ( server, cacheManager ) {
+  cache = cacheManager 
 
   server.addService(
     rdsServices.RouteDiscoveryServiceService, 

@@ -7,15 +7,15 @@ const googleStruct = require('google-protobuf/google/protobuf/struct_pb.js')
 const makeResponseNonce = require('./util/response-nonce')
 const messages = require('./util/messages')
 
-let store
+let cache
 
 function streamListeners(call) {
-  call.on('data', function( request ) {
+  call.on('data', async function( request ) {
     const params = request.toObject()
     // console.log(JSON.stringify( params, null, 2 ))
 
     // get stored data for request
-    const storedData = store.get( params )
+    const storedData = await cache.get( params )
     if ( !storedData ) {
       // console.log('NO DATA AVAILABLE')
       //return this.end()
@@ -101,8 +101,8 @@ function fetchListeners(call, callback) {
   console.log('fetchListeners called')
 }
 
-exports.registerServices = function ( server, configStore ) {
-  store = configStore 
+exports.registerServices = function ( server, cacheManager ) {
+  cache = cacheManager 
 
   server.addService(
     ldsServices.ListenerDiscoveryServiceService, 

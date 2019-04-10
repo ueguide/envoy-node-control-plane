@@ -6,24 +6,20 @@ const googlePBDuration = require('google-protobuf/google/protobuf/duration_pb.js
 const makeResponseNonce = require('./util/response-nonce')
 const messages = require('./util/messages')
 
-let store 
+let cache 
 
 function streamClusters(call) {
-  call.on('data', function( request ) {
+  call.on('data', async function( request ) {
     const params = request.toObject()
     // console.log(JSON.stringify( params, null, 2 ))
 
     // get stored data for request
-    const storedData = store.get( params )
+    const storedData = await cache.get( params )
     if ( !storedData ) {
       // console.log('NO DATA AVAILABLE')
       //return this.end()
     } else {
-      // check for nonce to stop infinite updates
       const nonce = makeResponseNonce( storedData )
-      if ( params.responseNonce === nonce ) {
-        //return this.end()
-      }
 
       // build discovery response
       const response = new discovery.DiscoveryResponse()
@@ -88,8 +84,8 @@ function fetchClusters(call, callback) {
   // placeholder
 }
 
-exports.registerServices = function ( server, configStore ) {
-  store = configStore 
+exports.registerServices = function ( server, cacheManager ) {
+  cache = cacheManager 
 
   server.addService(
     cdsServices.ClusterDiscoveryServiceService, 

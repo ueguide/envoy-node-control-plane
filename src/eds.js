@@ -5,24 +5,20 @@ const makeResponseNonce = require('./util/response-nonce')
 const messages = require('./util/messages')
 
 // passed storage module
-let store
+let cache
 
 function streamEndpoints(call) {
-  call.on('data', function( request ) {
+  call.on('data', async function( request ) {
     const params = request.toObject()
     // console.log(JSON.stringify( params, null, 2 ))
 
     // get stored data for request
-    const storedData = store.get( params )
+    const storedData = await cache.get( params )
     if ( !storedData ) {
       // console.log('NO DATA AVAILABLE')
       //return this.end()
     } else {
-      // check for nonce to stop infinite updates
       const nonce = makeResponseNonce( storedData )
-      if ( params.responseNonce === nonce ) {
-        //return this.end()
-      }
 
       // build discovery response
       const response = new discovery.DiscoveryResponse()
@@ -59,8 +55,8 @@ function fetchEndpoints(call, callback) {
   console.log('stream endpoints called')
 }
 
-exports.registerServices = function ( server, configStore ) {
-  store = configStore 
+exports.registerServices = function ( server, cacheManager ) {
+  cache = cacheManager 
 
   server.addService(
     edsServices.EndpointDiscoveryServiceService, 
