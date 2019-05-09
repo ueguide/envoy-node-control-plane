@@ -15,6 +15,191 @@
     "grpc": "^1.18.0"
   },
   "devDependencies": {
+    "eslint": "^5.16.0",
+    "eslint-plugin-jest": "^22.5.1",
     "jest": "^24.1.0"
+  },
+  "eslintConfig": {
+    "env": {
+      "browser": true,
+      "es6": true,
+      "node": true,
+      "jest": true
+    },
+    "plugins": [
+      "jest"
+    ],
+    "extends": [
+      "eslint:recommended",
+      "plugin:jest/recommended"
+    ],
+    "globals": {
+      "$": true
+    },
+    "parserOptions": {
+      "ecmaVersion": 2017,
+      "ecmaFeatures": {
+        "experimentalObjectRestSpread": true,
+        "jsx": false
+      },
+      "sourceType": "module"
+    },
+    "rules": {
+      "no-trailing-spaces": "error",
+      "no-console": [
+        "error",
+        {
+          "allow": [
+            "warn",
+            "error"
+          ]
+        }
+      ],
+      "indent": [
+        "error",
+        2
+      ],
+      "quotes": [
+        "error",
+        "single"
+      ],
+      "semi": [
+        "error",
+        "never"
+      ],
+      "default-case": "error",
+      "dot-notation": [
+        "error",
+        {
+          "allowKeywords": true
+        }
+      ],
+      "no-empty-function": "error",
+      "no-eval": "error",
+      "no-extra-bind": "error",
+      "no-lone-blocks": "error",
+      "no-implicit-coercion": "error",
+      "no-implied-eval": "error",
+      "no-multi-spaces": "error",
+      "no-script-url": "error",
+      "no-unused-vars": [
+        "error",
+        {
+          "vars": "local",
+          "varsIgnorePattern": "^([$|pieceObj])$",
+          "argsIgnorePattern": "^([$])$"
+        }
+      ],
+      "no-useless-concat": "error",
+      "prefer-destructuring": [
+        "warn",
+        {
+          "array": true,
+          "object": true
+        }
+      ],
+      "yoda": "error",
+      "array-bracket-spacing": [
+        "error",
+        "always",
+        {
+          "objectsInArrays": false
+        }
+      ],
+      "block-spacing": [
+        "error",
+        "always"
+      ],
+      "jsx-quotes": [
+        "error",
+        "prefer-double"
+      ],
+      "brace-style": [
+        "error",
+        "1tbs",
+        {
+          "allowSingleLine": true
+        }
+      ],
+      "comma-dangle": [
+        "error",
+        "never"
+      ],
+      "comma-spacing": [
+        "error",
+        {
+          "before": false,
+          "after": true
+        }
+      ],
+      "comma-style": [
+        "error",
+        "last"
+      ],
+      "keyword-spacing": [
+        "error",
+        {
+          "before": true,
+          "after": true
+        }
+      ],
+      "newline-before-return": "error",
+      "newline-per-chained-call": [
+        "error",
+        {
+          "ignoreChainWithDepth": 4
+        }
+      ],
+      "no-unneeded-ternary": "error",
+      "object-curly-newline": [
+        "warn",
+        {
+          "ObjectExpression": {
+            "multiline": true,
+            "minProperties": 1
+          },
+          "ObjectPattern": {
+            "consistent": true
+          }
+        }
+      ],
+      "object-property-newline": "error",
+      "one-var": [
+        "error",
+        {
+          "var": "never",
+          "let": "never",
+          "const": "never"
+        }
+      ],
+      "space-before-function-paren": [
+        "error",
+        {
+          "anonymous": "never",
+          "named": "never"
+        }
+      ],
+      "space-in-parens": [
+        "error",
+        "always",
+        {
+          "exceptions": [
+            "{}"
+          ]
+        }
+      ],
+      "spaced-comment": [
+        "error",
+        "always"
+      ],
+      "wrap-regex": "error",
+      "arrow-body-style": [
+        "error",
+        "always"
+      ],
+      "arrow-spacing": "error",
+      "no-duplicate-imports": "error",
+      "no-var": "error"
+    }
   }
 }

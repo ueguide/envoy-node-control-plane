@@ -1,67 +1,108 @@
-const edsServices = require('./pb/envoy/api/v2/eds_grpc_pb')
-const discovery = require('./pb/envoy/api/v2/discovery_pb')
-const googlePBAny = require('google-protobuf/google/protobuf/any_pb.js')
-const makeResponseNonce = require('./util/response-nonce')
-const messages = require('./util/messages')
+const edsServices = require( './pb/envoy/api/v2/eds_grpc_pb' )
+const discovery = require( './pb/envoy/api/v2/discovery_pb' )
+const googlePBAny = require( 'google-protobuf/google/protobuf/any_pb.js' )
+const messages = require( './util/messages' )
 
 // passed storage module
-let cache
+// let cache
 
-function streamEndpoints(call) {
-  call.on('data', async function( request ) {
-    const params = request.toObject()
-    // console.log(JSON.stringify( params, null, 2 ))
+const createResponse = ( cacheResponse ) => {
+  const { version, resourcesList } = cacheResponse
 
-    // get stored data for request
-    const storedData = await cache.get( params )
-    if ( !storedData ) {
-      // console.log('NO DATA AVAILABLE')
-      //return this.end()
-    } else {
-      const nonce = makeResponseNonce( storedData )
+  // build discovery response
+  const response = new discovery.DiscoveryResponse()
+  response.setVersionInfo( version.toString() )
+  response.setTypeUrl( 'type.googleapis.com/envoy.api.v2.ClusterLoadAssignment' )
 
-      // build discovery response
-      const response = new discovery.DiscoveryResponse()
-      response.setVersionInfo( 0 )
-      response.setTypeUrl( 'type.googleapis.com/envoy.api.v2.ClusterLoadAssignment' )
-      response.setNonce( nonce )
+  // build resources to assign
+  const returnResourcesList = resourcesList.map( function( dataResource ) {
+    // for each resource, great a google protobuf Any buffer message
+    const any = new googlePBAny.Any()
 
-      // build resources to assign
-      const resourcesList = storedData.resourcesList.map( function ( dataResource ) {
-        // for each resource, great a google protobuf Any buffer message
-        const any = new googlePBAny.Any()
+    // create ClusterLoadAssignment message
+    const clusterLoadAssignment = messages.buildClusterLoadAssignment( dataResource )
 
-        // create ClusterLoadAssignment message
-        const clusterLoadAssignment = messages.buildClusterLoadAssignment( dataResource )
-        
-        // pack cluster load assignment message into any
-        any.pack( clusterLoadAssignment.serializeBinary(), 'envoy.api.v2.ClusterLoadAssignment')
+    // pack cluster load assignment message into any
+    any.pack( clusterLoadAssignment.serializeBinary(), 'envoy.api.v2.ClusterLoadAssignment' )
 
-        return any
-      })
+    return any
+  })
 
-      // assign resources to response
-      response.setResourcesList( resourcesList )
-      // write response
-      this.write(response)
+  // assign resources to response
+  response.setResourcesList( returnResourcesList )
+
+  return response
+}
+
+const makeStreamEndpoints = ( cache ) => {
+  return ( call ) => {
+    // set stream id
+
+    // unique nonce generator for req-resp pairs per xDS stream; the server
+    // ignores stale nonces. nonce is only modified within send() function.
+    let streamNonce = 0
+
+    // store cancel watcher function
+    let streamWatcher
+
+    // sends a serialized protobuf response
+    const send = ( cacheResponse ) => {
+      // create DiscoveryResponse from cache service response
+      const response = createResponse( cacheResponse )
+
+      // increment nonce
+      streamNonce++
+      response.setNonce( streamNonce.toString() )
+      // console.log( 'streamNonce>>>', streamNonce )
+
+      // write to stream
+      call.write( response )
     }
-  })
-  call.on('end', function() {
-    call.end()
-  })
+
+    call.on( 'data', async function( request ) {
+      // console.log( '----received request on stream----', streamNonce )
+      // console.log( JSON.stringify( request.toObject(), null, 2 ) )
+      const nonce = request.getResponseNonce()
+
+      if ( nonce === '' || nonce.toString() === streamNonce.toString() ) {
+        // cancel current watcher if set
+        if ( streamWatcher ) {
+          streamWatcher.cancel()
+        }
+        // console.log( 'CREATE CACHE WATCHER' )
+        const { cacheResponse, watcher } = await cache.createWatch( request )
+        streamWatcher = watcher
+        if ( cacheResponse ) {
+          send( cacheResponse )
+        } else if ( watcher ) {
+          send( await watcher.watch() )
+        }
+
+      }
+    })
+
+    call.on( 'end', function() {
+      // cancel current watcher if set
+      if ( streamWatcher ) {
+        streamWatcher.cancel()
+      }
+      call.end()
+    })
+  }
 }
 
-function fetchEndpoints(call, callback) {
-  console.log('stream endpoints called')
+exports.makeStreamEndpoints = makeStreamEndpoints
+
+function fetchEndpoints( /* call, callback */ ) {
+  // console.log( 'stream endpoints called' )
 }
 
-exports.registerServices = function ( server, cacheManager ) {
-  cache = cacheManager 
+exports.registerServices = function( server, cacheManager ) {
 
   server.addService(
-    edsServices.EndpointDiscoveryServiceService, 
+    edsServices.EndpointDiscoveryServiceService,
     {
-      streamEndpoints: streamEndpoints,
+      streamEndpoints: makeStreamEndpoints( cacheManager ),
       fetchEndpoints: fetchEndpoints
     }
   )

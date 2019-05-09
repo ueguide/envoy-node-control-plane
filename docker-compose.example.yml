@@ -37,30 +37,30 @@ services:
     networks:
       - envoymesh
     
-  service-b:
-    image: node:alpine
-    working_dir: /opt/app
-    volumes:
-      - ./example/service_b/index.js:/opt/app/index.js
-    command: node index.js
-    ports:
-      - "3002:3002"
-    networks:
-      envoymesh:
-        aliases:
-          - service_b
-
-  service-b-envoy:
-    image: envoyproxy/envoy:latest
-    volumes:
-      - ./example/service_b/envoy.yaml:/etc/envoy.yaml
-      - ./example/service_b/envoy.static.yaml:/etc/envoy.static.yaml
-    ports:
-      - "8081:80"
-      - "8002:8001"
-    command: /usr/local/bin/envoy -c /etc/envoy.yaml --service-cluster service_b --service-node service_b
-    networks:
-      - envoymesh
+  #service-b:
+  #  image: node:alpine
+  #  working_dir: /opt/app
+  #  volumes:
+  #    - ./example/service_b/index.js:/opt/app/index.js
+  #  command: node index.js
+  #  ports:
+  #    - "3002:3002"
+  #  networks:
+  #    envoymesh:
+  #      aliases:
+  #        - service_b
+#
+  #service-b-envoy:
+  #  image: envoyproxy/envoy:latest
+  #  volumes:
+  #    - ./example/service_b/envoy.yaml:/etc/envoy.yaml
+  #    - ./example/service_b/envoy.static.yaml:/etc/envoy.static.yaml
+  #  ports:
+  #    - "8081:80"
+  #    - "8002:8001"
+  #  command: /usr/local/bin/envoy -c /etc/envoy.yaml --service-cluster service_b --service-node service_b
+  #  networks:
+  #    - envoymesh
 
 networks:
   envoymesh: {}

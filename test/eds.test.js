@@ -1,112 +1,178 @@
-const grpc = require('grpc')
-const eds = require('../src/eds')
-const edsPB = require('../src/pb/envoy/api/v2/eds_pb')
-const edsServices = require('../src/pb/envoy/api/v2/eds_grpc_pb')
-const discoveryMessages = require('../src/pb/envoy/api/v2/discovery_pb')
-const envoyCore = require('../src/pb/envoy/api/v2/core/base_pb')
-const googlePBAny = require('google-protobuf/google/protobuf/any_pb.js')
-const mockDataStore = require('./mockDataStore')
+const eds = require( '../src/eds' )
+const edsPB = require( '../src/pb/envoy/api/v2/eds_pb' )
+const discoveryMessages = require( '../src/pb/envoy/api/v2/discovery_pb' )
+const envoyCore = require( '../src/pb/envoy/api/v2/core/base_pb' )
+const googlePBAny = require( 'google-protobuf/google/protobuf/any_pb.js' )
 
-let client
-let server
+describe( 'Endpoint Discovery Service', () => {
 
-beforeAll((done) => {
-	server = new grpc.Server()
-	eds.registerServices( server, mockDataStore )
-	server.bind('0.0.0.0:55051', grpc.ServerCredentials.createInsecure())
-	server.start()
+  describe( 'streamEndpoints', () => {
 
-  client = new edsServices.EndpointDiscoveryServiceClient(
-      'localhost:55051',
-      grpc.credentials.createInsecure()
-  )
-  done()
-})
+    let requestHandler
+    let callResponse
+    let call
 
-afterAll(done => {
-	client = null
-	server.forceShutdown()
-  done()
-})
+    beforeEach( () => {
+      call = {
+        on: jest.fn().mockImplementation( ( event, cb ) => {
+          if ( event === 'data' ) {
+            requestHandler = cb
+          }
+        }),
+        write: jest.fn().mockImplementation( response => {
+          callResponse = response
+        })
+      }
+    })
 
+    test( 'it writes response on found node', ( done ) => {
+      const cache = {
+        createWatch: jest.fn().mockImplementation( () => {
+          return {
+            cacheResponse: {
+              version: '1',
+              resourcesList: [
+                {
+                  'cluster_name': 'remote_cluster',
+                  'endpoints': [
+                    {
+                      'lb_endpoints': [
+                        {
+                          'endpoint': {
+                            'address': {
+                              'socket_address': {
+                                'address': '34.231.242.239',
+                                'port_value': '32770'
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            watcher: null
+          }
+        })
+      }
 
-describe('Endpoint Discovery Service', () => {
+      const request = new discoveryMessages.DiscoveryRequest()
+      const node = new envoyCore.Node()
+      node.setId( 'test-node' )
+      node.setCluster( 'test-cluster' )
+      request.setNode( node )
+      request.setTypeUrl( 'type.googleapis.com/envoy.api.v2.ClusterLoadAssignment' )
+      request.setResponseNonce( '' )
+      request.setResourceNamesList( [ 'remote_cluster' ] )
 
-	describe('streamEndpoints', () => {
+      // call streamEndpoints (fires call.on methods)
+      eds.makeStreamEndpoints( cache )( call )
 
-		test('should receive nothing with empty data', ( done ) => {
-			const request = new discoveryMessages.DiscoveryRequest()
-			const node = new envoyCore.Node()
-			node.setId( 'foobar' )
-			node.setCluster( 'test_cluster' )
-			request.setNode( node )
-			request.setTypeUrl( 'type.googleapis.com/envoy.api.v2.ClusterLoadAssignment' )
-			request.setResponseNonce( '' )
-			request.setResourceNamesList( ['foobar'])
-			// console.log(request.toObject())
-	
-			const call = client.streamEndpoints()
-	
-			call.on('data', ( response ) => {
-				done.fail('should not receive response data')
-			})
-	
-			call.on('end', () => {
-				done()
-			})
+      requestHandler( request )
+        .then( () => {
+          expect( call.write ).toHaveBeenCalled()
 
-			call.on('error', ( err ) => {
-				done.fail(err)
-			})
-	
-			call.write( request )
-			call.end()
-		})
+          const result = callResponse.toObject()
+          expect( result.versionInfo ).toEqual( '1' )
+          expect( result.nonce ).toEqual( '1' )
 
-		test('should receive response with found node', ( done ) => {
-			const request = new discoveryMessages.DiscoveryRequest()
-			const node = new envoyCore.Node()
-			node.setId( 'test_node' )
-			node.setCluster( 'test_cluster' )
-			request.setNode( node )
-			request.setTypeUrl( 'type.googleapis.com/envoy.api.v2.ClusterLoadAssignment' )
-			request.setResponseNonce( '' )
-			request.setResourceNamesList( ['test_cluster'])
-	
-			const call = client.streamEndpoints()
-			let result
-	
-			call.on('data', ( response ) => {
-				result = response.toObject()
-				const resource = result.resourcesList[0]
-				const any = new googlePBAny.Any()
-				any.setTypeUrl( resource.typeUrl )
-				any.setValue( resource.value )
-				const clusterAssignment = any.unpack( 
-					edsPB.ClusterLoadAssignment.deserializeBinary, 
-					any.getTypeName() 
-				)
-				.toObject()
-				expect( clusterAssignment ).toBeTruthy()
-				done()
-			})
-	
-			call.on('end', () => {
-				done.fail('should not end before receiving response')
-			})
+          const [ resource ] = result.resourcesList
+          expect( resource.typeUrl ).toEqual( 'type.googleapis.com/envoy.api.v2.ClusterLoadAssignment' )
+          const any = new googlePBAny.Any()
+          any.setTypeUrl( resource.typeUrl )
+          any.setValue( resource.value )
+          const clusterAssignment = any.unpack(
+            edsPB.ClusterLoadAssignment.deserializeBinary,
+            any.getTypeName()
+          ).toObject()
+          // console.log( clusterAssignment )
+          expect( clusterAssignment.clusterName ).toEqual( 'remote_cluster' )
+          done()
+        })
+        .catch( err => {
+          done.fail( err )
+        })
+    })
 
-			call.on('error', ( err ) => {
-				if ( !result ) {
-					console.log(err)
-					done.fail('should have responsed with result')
-				}
-			})
-	
-			call.write( request )
-			call.end()
-		})
+    test( 'calls watcher if no cache response, returns response once fulfilled', ( done ) => {
+      const cache = {
+        createWatch: jest.fn().mockImplementation( () => {
+          return {
+            cacheResponse: null,
+            watcher: {
+              watch: jest.fn().mockImplementation( () => {
+                return {
+                  version: '2',
+                  resourcesList: [
+                    {
+                      'cluster_name': 'remote_cluster',
+                      'endpoints': [
+                        {
+                          'lb_endpoints': [
+                            {
+                              'endpoint': {
+                                'address': {
+                                  'socket_address': {
+                                    'address': '34.231.242.239',
+                                    'port_value': '32770'
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }),
+              cancel: jest.fn()
+            }
+          }
+        })
+      }
 
-	})
+      const request = new discoveryMessages.DiscoveryRequest()
+      request.setVersionInfo( '1' )
+      const node = new envoyCore.Node()
+      node.setId( 'test-node' )
+      node.setCluster( 'test-cluster' )
+      request.setNode( node )
+      request.setTypeUrl( 'type.googleapis.com/envoy.api.v2.ClusterLoadAssignment' )
+      request.setResponseNonce( '' )
+      request.setResourceNamesList( [ 'remote_cluster' ] )
+
+      // call streamEndpoints (fires call.on methods)
+      eds.makeStreamEndpoints( cache )( call )
+
+      requestHandler( request )
+        .then( () => {
+          expect( call.write ).toHaveBeenCalled()
+
+          const result = callResponse.toObject()
+          expect( result.versionInfo ).toEqual( '2' )
+
+          const [ resource ] = result.resourcesList
+          expect( resource.typeUrl ).toEqual( 'type.googleapis.com/envoy.api.v2.ClusterLoadAssignment' )
+          const any = new googlePBAny.Any()
+          any.setTypeUrl( resource.typeUrl )
+          any.setValue( resource.value )
+          const clusterAssignment = any.unpack(
+            edsPB.ClusterLoadAssignment.deserializeBinary,
+            any.getTypeName()
+          ).toObject()
+          // console.log( clusterAssignment )
+          expect( clusterAssignment.clusterName ).toEqual( 'remote_cluster' )
+          done()
+        })
+        .catch( err => {
+          done.fail( err )
+        })
+    })
+
+  })
 
 })
 
