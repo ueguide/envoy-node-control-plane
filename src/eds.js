@@ -76,7 +76,9 @@ const makeStreamEndpoints = ( cache ) => {
           send( cacheResponse )
         } else if ( watcher ) {
           const awaitedResponse = await watcher.watch()
-          send( awaitedResponse )
+          if ( awaitedResponse ) {
+            send( awaitedResponse )
+          }
         }
 
       }
