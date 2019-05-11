@@ -85,6 +85,7 @@ const makeStreamEndpoints = ( cache ) => {
     })
 
     call.on( 'end', function() {
+      console.log( '--- END CALLED ---' )
       // cancel current watcher if set
       if ( streamWatcher ) {
         streamWatcher.cancel()
