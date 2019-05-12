@@ -34,7 +34,7 @@ const createResponse = ( cacheResponse ) => {
   return response
 }
 
-const makeStreamEndpoints = ( cache ) => {
+const makeStreamEndpoints = ( cache, logger = null ) => {
   return ( call ) => {
     // set stream id
 
@@ -46,7 +46,7 @@ const makeStreamEndpoints = ( cache ) => {
     let streamWatcher
 
     // sends a serialized protobuf response
-    const send = ( cacheResponse ) => {
+    const send = ( cacheResponse, request ) => {
       // create DiscoveryResponse from cache service response
       const response = createResponse( cacheResponse )
 
@@ -57,40 +57,86 @@ const makeStreamEndpoints = ( cache ) => {
 
       // write to stream
       call.write( response )
+      // log
+      if ( logger ) {
+        logger.info(
+          '--RESPONSE--',
+          `Node=${request.getNode().getId()}`,
+          'T=EDS',
+          `V=${response.getVersionInfo()}`,
+          `N=${streamNonce.toString()}`,
+          request.getResourceNamesList()
+        )
+      }
     }
 
     call.on( 'data', async function( request ) {
       // console.log( '----received request on stream----', streamNonce )
       // console.log( JSON.stringify( request.toObject(), null, 2 ) )
       const nonce = request.getResponseNonce()
+      if ( logger ) {
+        logger.info(
+          '--REQUEST--',
+          `Node=${request.getNode().getId()}`,
+          'T=EDS',
+          `V=${request.getVersionInfo()}`,
+          `N=${nonce}`,
+          request.getResourceNamesList()
+        )
+      }
 
       if ( nonce === '' || nonce.toString() === streamNonce.toString() ) {
         // cancel current watcher if set
         if ( streamWatcher ) {
-          console.log( 'eds cancel streamWatcher>>>', streamWatcher.id )
           streamWatcher.cancel()
         }
-        // console.log( 'CREATE CACHE WATCHER' )
+        // create watcher - returns cache response or watcher promise to return
         const { cacheResponse, watcher } = await cache.createWatch( request )
         streamWatcher = watcher
         if ( cacheResponse ) {
-          send( cacheResponse )
+          send( cacheResponse, request )
         } else if ( watcher ) {
+          if ( logger ) {
+            logger.info(
+              '--WAIT-FOR-RESPONSE--',
+              `Node=${request.getNode().getId()}`,
+              'T=EDS',
+              `V=${request.getVersionInfo()}`,
+              `N=${nonce}`,
+              request.getResourceNamesList()
+            )
+          }
           const awaitedResponse = await watcher.watch()
           if ( awaitedResponse ) {
-            send( awaitedResponse )
+            // reset streamWatcher
+            streamWatcher = null
+            // send response
+            send( awaitedResponse, request )
           } else {
-            console.log( '<<<NULL WATCHER RESPONSE>>>' )
+            // do nothing
           }
         }
 
       } else {
-        console.log( '<<<STALE NONCE>>>', nonce.toString(), 'stream:', streamNonce )
+        if ( logger ) {
+          logger.info(
+            `--STALE-NONCE(${streamNonce})--`,
+            `Node=${request.getNode().getId()}`,
+            'T=EDS',
+            `V=${request.getVersionInfo()}`,
+            `N=${nonce}`,
+            request.getResourceNamesList()
+          )
+        }
       }
     })
 
     call.on( 'end', function() {
-      console.log( '--- END CALLED ---' )
+      if ( logger ) {
+        logger.info(
+          `--END-STREAM(${streamNonce})--`
+        )
+      }
       // cancel current watcher if set
       if ( streamWatcher ) {
         streamWatcher.cancel()
@@ -106,12 +152,12 @@ function fetchEndpoints( /* call, callback */ ) {
   // console.log( 'stream endpoints called' )
 }
 
-exports.registerServices = function( server, cacheManager ) {
+exports.registerServices = function( server, cacheManager, logger = null ) {
 
   server.addService(
     edsServices.EndpointDiscoveryServiceService,
     {
-      streamEndpoints: makeStreamEndpoints( cacheManager ),
+      streamEndpoints: makeStreamEndpoints( cacheManager, logger ),
       fetchEndpoints: fetchEndpoints
     }
   )

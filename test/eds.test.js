@@ -3,6 +3,7 @@ const edsPB = require( '../src/pb/envoy/api/v2/eds_pb' )
 const discoveryMessages = require( '../src/pb/envoy/api/v2/discovery_pb' )
 const envoyCore = require( '../src/pb/envoy/api/v2/core/base_pb' )
 const googlePBAny = require( 'google-protobuf/google/protobuf/any_pb.js' )
+const logger = require( 'node-logger' ).createLogger()
 
 describe( 'Endpoint Discovery Service', () => {
 
@@ -68,7 +69,7 @@ describe( 'Endpoint Discovery Service', () => {
       request.setResourceNamesList( [ 'remote_cluster' ] )
 
       // call streamEndpoints (fires call.on methods)
-      eds.makeStreamEndpoints( cache )( call )
+      eds.makeStreamEndpoints( cache, logger )( call )
 
       requestHandler( request )
         .then( () => {
@@ -145,7 +146,7 @@ describe( 'Endpoint Discovery Service', () => {
       request.setResourceNamesList( [ 'remote_cluster' ] )
 
       // call streamEndpoints (fires call.on methods)
-      eds.makeStreamEndpoints( cache )( call )
+      eds.makeStreamEndpoints( cache, logger )( call )
 
       requestHandler( request )
         .then( () => {
