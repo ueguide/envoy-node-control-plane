@@ -90,6 +90,11 @@ const makeStreamEndpoints = ( cache, logger = null ) => {
         nonce.toString() === streamNonce.toString() || // req-resp pair match
         ( streamNonce === 0 && parseInt( nonce ) > 0 ) // management server deployment rollover
       ) {
+        if ( logger && streamNonce === 0 && parseInt( nonce ) > 0 ) {
+          logger.info(
+            '--CAUGHT ROLLOVER STREAM FROM PREVIOUS XDS SERVER--'
+          )
+        }
         // cancel current watcher if set
         if ( streamWatcher ) {
           streamWatcher.cancel()
