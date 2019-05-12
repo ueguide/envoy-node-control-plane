@@ -85,7 +85,11 @@ const makeStreamEndpoints = ( cache, logger = null ) => {
         )
       }
 
-      if ( nonce === '' || nonce.toString() === streamNonce.toString() ) {
+      if (
+        nonce === '' || // first time call
+        nonce.toString() === streamNonce.toString() || // req-resp pair match
+        ( streamNonce === 0 && parseInt( nonce ) > 0 ) // management server deployment rollover
+      ) {
         // cancel current watcher if set
         if ( streamWatcher ) {
           streamWatcher.cancel()
