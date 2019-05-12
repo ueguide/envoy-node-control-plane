@@ -67,6 +67,7 @@ const makeStreamEndpoints = ( cache ) => {
       if ( nonce === '' || nonce.toString() === streamNonce.toString() ) {
         // cancel current watcher if set
         if ( streamWatcher ) {
+          console.log( 'eds cancel streamWatcher>>>', streamWatcher.id )
           streamWatcher.cancel()
         }
         // console.log( 'CREATE CACHE WATCHER' )
@@ -78,9 +79,13 @@ const makeStreamEndpoints = ( cache ) => {
           const awaitedResponse = await watcher.watch()
           if ( awaitedResponse ) {
             send( awaitedResponse )
+          } else {
+            console.log( '<<<NULL WATCHER RESPONSE>>>' )
           }
         }
 
+      } else {
+        console.log( '<<<STALE NONCE>>>', nonce.toString(), 'stream:', streamNonce )
       }
     })
 
